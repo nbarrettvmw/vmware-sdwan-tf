@@ -1,78 +1,48 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 2.65"
+# SD-WAN -specific local variables & resources
+
+locals {
+  vce_userdata = base64encode(templatefile("${path.module}/templates/vce_userdata.yml", {
+    activation_code = "${var.activation_code}"
+    vco_url         = "${var.vco_url}"
+  }))
+
+  wan_nsg_rules = {
+    vcmp = {
+      name                       = "VCMP"
+      priority                   = 100
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Udp"
+      source_port_range          = "*"
+      destination_port_range     = "2426"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
+    }
+
+    snmp = {
+      name                       = "SNMP"
+      priority                   = 200
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Udp"
+      source_port_range          = "*"
+      destination_port_range     = "161"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
+    }
+
+    ssh = {
+      name                       = "SSH"
+      priority                   = 300
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "22"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
     }
   }
-}
-
-resource "azurerm_virtual_network" "tf_vnet" {
-  name                = "${var.name}-vnet"
-  location            = var.location
-  resource_group_name = var.rg_name
-  address_space       = [var.cidr]
-}
-
-resource "azurerm_subnet" "tf_vnet_sn_dmz" {
-  name                 = "${var.name}-vnet-sn-dmz"
-  resource_group_name  = var.rg_name
-  virtual_network_name = azurerm_virtual_network.tf_vnet.name
-  address_prefixes     = [local.cidr_dmz]
-}
-
-resource "azurerm_subnet" "tf_vnet_sn_priv" {
-  name                 = "${var.name}-vnet-sn-priv"
-  resource_group_name  = var.rg_name
-  virtual_network_name = azurerm_virtual_network.tf_vnet.name
-  address_prefixes     = [local.cidr_priv]
-}
-
-resource "azurerm_route_table" "tf_rt_dmz" {
-  name                = "${var.name}-rt-dmz"
-  location            = var.location
-  resource_group_name = var.rg_name
-
-  route {
-    name           = "local"
-    address_prefix = var.cidr
-    next_hop_type  = "vnetlocal"
-  }
-
-  route {
-    name           = "Internet"
-    address_prefix = "0.0.0.0/0"
-    next_hop_type  = "Internet"
-  }
-}
-
-resource "azurerm_route_table" "tf_rt_priv" {
-  name                = "${var.name}-rt-priv"
-  location            = var.location
-  resource_group_name = var.rg_name
-
-  route {
-    name           = "local"
-    address_prefix = var.cidr
-    next_hop_type  = "vnetlocal"
-  }
-
-  route {
-    name                   = "default"
-    address_prefix         = "0.0.0.0/0"
-    next_hop_type          = "VirtualAppliance"
-    next_hop_in_ip_address = local.vce_ip_priv
-  }
-}
-
-resource "azurerm_subnet_route_table_association" "tf_sn_rt_assoc_dmz" {
-  subnet_id      = azurerm_subnet.tf_vnet_sn_dmz.id
-  route_table_id = azurerm_route_table.tf_rt_dmz.id
-}
-
-resource "azurerm_subnet_route_table_association" "tf_sn_rt_assoc_priv" {
-  subnet_id      = azurerm_subnet.tf_vnet_sn_priv.id
-  route_table_id = azurerm_route_table.tf_rt_priv.id
 }
 
 resource "azurerm_public_ip" "tf_pub_vce_wan" {

@@ -21,11 +21,6 @@ variable "env_name" {
   description = "Short name used as a prefix for object names"
 }
 
-variable "rg_name" {
-  type = string
-  description = "Azure Resource Group name for this deployment"
-}
-
 variable "location" {
   type = string
   description = "Azure region for the environment i.e. northcentralus"
